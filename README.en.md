@@ -94,7 +94,7 @@ If your network cannot reach TypeSafe's API (HTTP 451), switch to another source
 ### Local Mac
 
 ```
-git clone https://github.com/8itlab/reflex-cu && cd reflex-cu
+git clone https://github.com/8itlab/reflex-computer-use && cd reflex-cu
 python3 -m venv ~/.reflexcu/venv
 ~/.reflexcu/venv/bin/pip install -r requirements-macos.txt
 claude mcp add reflexcu -s user -- ~/.reflexcu/venv/bin/python "$PWD/reflexcu/server.py"
@@ -105,7 +105,7 @@ The app that launches the agent (Terminal, an IDE) needs the Accessibility and S
 ### Local Windows
 
 ```
-git clone https://github.com/8itlab/reflex-cu
+git clone https://github.com/8itlab/reflex-computer-use
 cd reflex-cu
 python -m venv venv
 venv\Scripts\pip install -r requirements-windows.txt
@@ -119,7 +119,7 @@ To control programs running as administrator, the agent itself must run as admin
 On the machine to be controlled (you must already be able to SSH into it):
 
 ```
-git clone https://github.com/8itlab/reflex-cu C:\reflexcu
+git clone https://github.com/8itlab/reflex-computer-use C:\reflexcu
 powershell -ExecutionPolicy Bypass -File C:\reflexcu\scripts\install-windows-daemon.ps1
 ```
 

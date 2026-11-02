@@ -6,11 +6,11 @@ Tools: status, screenshot, windows, focus, observe, click, move, drag, scroll, k
 
 ## Docs
 
-- [README (English)](https://github.com/8itlab/reflex-cu/blob/main/README.en.md): what it does, tools, installation, configuration, measurements, FAQ
-- [README (中文)](https://github.com/8itlab/reflex-cu/blob/main/README.md): 中文说明
-- [Installation guide for AI agents](https://github.com/8itlab/reflex-cu/blob/main/INSTALL_FOR_AI.en.md): step-by-step instructions written for the coding agent that installs it on a user's behalf
-- [给 AI 的安装说明](https://github.com/8itlab/reflex-cu/blob/main/INSTALL_FOR_AI.md)
+- [README (English)](https://github.com/8itlab/reflex-computer-use/blob/main/README.en.md): what it does, tools, installation, configuration, measurements, FAQ
+- [README (中文)](https://github.com/8itlab/reflex-computer-use/blob/main/README.md): 中文说明
+- [Installation guide for AI agents](https://github.com/8itlab/reflex-computer-use/blob/main/INSTALL_FOR_AI.en.md): step-by-step instructions written for the coding agent that installs it on a user's behalf
+- [给 AI 的安装说明](https://github.com/8itlab/reflex-computer-use/blob/main/INSTALL_FOR_AI.md)
 
 ## Install in one sentence
 
-Tell your coding agent: "Install reflex-cu for me, following https://github.com/8itlab/reflex-cu/blob/main/INSTALL_FOR_AI.en.md"
+Tell your coding agent: "Install reflex-cu for me, following https://github.com/8itlab/reflex-computer-use/blob/main/INSTALL_FOR_AI.en.md"

@@ -24,7 +24,7 @@ PROVIDERS = {
     # The extra headers are OpenRouter's app attribution: they name this project, nothing about the user.
     'openrouter': {'url': 'https://openrouter.ai/api/v1/systemone', 'model': '~typesafe/jev-latest',
                    'env': 'OPENROUTER_API_KEY', 'file': 'openrouter_key',
-                   'headers': {'HTTP-Referer': 'https://github.com/8itlab/reflex-cu', 'X-OpenRouter-Title': 'reflex-cu',
+                   'headers': {'HTTP-Referer': 'https://github.com/8itlab/reflex-computer-use', 'X-OpenRouter-Title': 'reflex-cu',
                                'X-OpenRouter-Categories': 'personal-agent'}},
     'commandcode': {'url': 'https://api.commandcode.ai/provider/v1/systemone', 'model': 'typesafe/jev',
                     'env': 'COMMANDCODE_API_KEY', 'file': 'commandcode_key'},
