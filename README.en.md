@@ -1,6 +1,8 @@
 # reflex-cu
 
-[中文](README.md)
+<!-- mcp-name: io.github.8itlab/reflex-computer-use -->
+
+[中文](https://github.com/8itlab/reflex-computer-use/blob/main/README.md)
 
 **reflex-cu** is an open-source **computer use** MCP server for coding agents such as Claude Code and Codex. It lets an AI agent operate a macOS or Windows desktop, or a remote Windows machine over SSH, by reading the accessibility / UI Automation tree instead of taking a screenshot at every step.
 
@@ -69,9 +71,18 @@ All coordinates refer to a screenshot taken without `zoom`: the main display sca
 
 ## Installation
 
-To have an AI install it for you, give your coding agent the link to [INSTALL_FOR_AI.en.md](INSTALL_FOR_AI.en.md) and ask it to follow that. Manual steps are below.
+To have an AI install it for you, give your coding agent the link to [INSTALL_FOR_AI.en.md](https://github.com/8itlab/reflex-computer-use/blob/main/INSTALL_FOR_AI.en.md) and ask it to follow that. Manual steps are below.
 
 Python 3.10 or later.
+
+**Quick start (controlling this Mac or Windows machine)**: the PyPI release is pending. With [uv](https://docs.astral.sh/uv/) installed, run directly from the GitHub source archive:
+
+```
+claude mcp add reflexcu -s user -- uvx --from https://github.com/8itlab/reflex-computer-use/archive/refs/heads/main.tar.gz reflex-computer-use
+codex mcp add reflexcu -- uvx --from https://github.com/8itlab/reflex-computer-use/archive/refs/heads/main.tar.gz reflex-computer-use
+```
+
+Or install the source archive with `pip install https://github.com/8itlab/reflex-computer-use/archive/refs/heads/main.tar.gz` and start it with the `reflex-computer-use` command. To control another Windows machine remotely, follow "Remote Windows" below.
 
 ### Jev API key (bring your own)
 

@@ -73,6 +73,15 @@ Jev 1.13 起能看图，1.14 又加了"框出某个东西"的问题类型。加�
 
 需要 Python 3.10 以上。
 
+**快速安装（操作本机 Mac 或 Windows）**：PyPI 发布尚未完成。装了 [uv](https://docs.astral.sh/uv/) 后，可以直接从 GitHub 源码包注册：
+
+```
+claude mcp add reflexcu -s user -- uvx --from https://github.com/8itlab/reflex-computer-use/archive/refs/heads/main.tar.gz reflex-computer-use
+codex mcp add reflexcu -- uvx --from https://github.com/8itlab/reflex-computer-use/archive/refs/heads/main.tar.gz reflex-computer-use
+```
+
+或者 `pip install https://github.com/8itlab/reflex-computer-use/archive/refs/heads/main.tar.gz` 后用命令 `reflex-computer-use` 启动。远程操作另一台 Windows 仍按下文"远程 Windows"安装。
+
 ### Jev 密钥（需自备）
 
 本项目不附带、也不代理任何 Jev 额度。`find`、`check`、`wait` 三个工具要用你自己的密钥，费用由你自己的账户承担。不配置密钥也能用，只是这三个工具会报错，其余工具不受影响。
