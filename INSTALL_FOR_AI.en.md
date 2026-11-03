@@ -2,7 +2,7 @@
 
 [中文](INSTALL_FOR_AI.md)
 
-This document is written for the coding agent (Claude Code, Codex, ...) that installs reflex-cu on a user's behalf. The user only has to say: "Install this for me, following https://github.com/8itlab/reflex-computer-use/blob/main/INSTALL_FOR_AI.en.md."
+This document is written for the coding agent (Claude Code, Codex, ...) that installs reflex-computer-use on a user's behalf. The user only has to say: "Install this for me, following https://github.com/8itlab/reflex-computer-use/blob/main/INSTALL_FOR_AI.en.md."
 
 Your job: ask a few questions, install, verify, and tell the user how to start. Every step comes with a check. Do not move on while a check fails.
 
@@ -28,9 +28,9 @@ You cannot find these out yourself. Ask them all at once:
 ## Local Mac
 
 ```
-git clone https://github.com/8itlab/reflex-computer-use ~/reflex-cu
+git clone https://github.com/8itlab/reflex-computer-use ~/reflex-computer-use
 python3 -m venv ~/.reflexcu/venv
-~/.reflexcu/venv/bin/pip install -r ~/reflex-cu/requirements-macos.txt
+~/.reflexcu/venv/bin/pip install -r ~/reflex-computer-use/requirements-macos.txt
 ```
 
 Python 3.10 or later is required.
@@ -38,7 +38,7 @@ Python 3.10 or later is required.
 Check:
 
 ```
-~/.reflexcu/venv/bin/python ~/reflex-cu/reflexcu/server.py status
+~/.reflexcu/venv/bin/python ~/reflex-computer-use/reflexcu/server.py status
 ```
 
 It should print JSON. Look at three fields:
@@ -84,8 +84,8 @@ ssh <alias> "powershell -ExecutionPolicy Bypass -File C:\reflexcu\scripts\instal
 The machine you run on needs only the repository and the system Python 3, no dependencies:
 
 ```
-git clone https://github.com/8itlab/reflex-computer-use ~/reflex-cu
-CU_SSH=<alias> CU_DIR='C:\reflexcu' python3 ~/reflex-cu/reflexcu/server.py status
+git clone https://github.com/8itlab/reflex-computer-use ~/reflex-computer-use
+CU_SSH=<alias> CU_DIR='C:\reflexcu' python3 ~/reflex-computer-use/reflexcu/server.py status
 ```
 
 `host` should be the remote machine's name and `screen` its real resolution.
@@ -123,16 +123,16 @@ Claude Code:
 
 ```
 # local
-claude mcp add reflexcu -s user -- ~/.reflexcu/venv/bin/python ~/reflex-cu/reflexcu/server.py
+claude mcp add reflexcu -s user -- ~/.reflexcu/venv/bin/python ~/reflex-computer-use/reflexcu/server.py
 # remote
-claude mcp add winbox -s user -e CU_SSH=<alias> -e 'CU_DIR=C:\reflexcu' -- python3 ~/reflex-cu/reflexcu/server.py
+claude mcp add winbox -s user -e CU_SSH=<alias> -e 'CU_DIR=C:\reflexcu' -- python3 ~/reflex-computer-use/reflexcu/server.py
 ```
 
 Codex:
 
 ```
-codex mcp add reflexcu -- ~/.reflexcu/venv/bin/python ~/reflex-cu/reflexcu/server.py
-codex mcp add winbox --env CU_SSH=<alias> --env 'CU_DIR=C:\reflexcu' -- python3 ~/reflex-cu/reflexcu/server.py
+codex mcp add reflexcu -- ~/.reflexcu/venv/bin/python ~/reflex-computer-use/reflexcu/server.py
+codex mcp add winbox --env CU_SSH=<alias> --env 'CU_DIR=C:\reflexcu' -- python3 ~/reflex-computer-use/reflexcu/server.py
 ```
 
 - On local Windows the command is `C:\reflexcu\venv\Scripts\python.exe C:\reflexcu\reflexcu\server.py`.

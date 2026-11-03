@@ -1,8 +1,8 @@
-# reflex-cu
+# reflex-computer-use
 
-> **reflex-cu** is an open-source **computer use** MCP server for Claude Code, Codex and other AI agents. It controls macOS and Windows desktops, including a remote Windows machine over SSH, by reading the accessibility / UI Automation tree instead of taking a screenshot at every step, and uses **Jev** (TypeSafe's System One decision model; a TypeSafe, OpenRouter or Command Code key works) as a fast judge. Since 0.4, Jev can also look at the screen itself (`look`: Jev 1.14 image input and boxes) to find icons and things in game scenes. → [English README](README.en.md)
+> **reflex-computer-use** is an open-source **computer use** MCP server for Claude Code, Codex and other AI agents. It controls macOS and Windows desktops, including a remote Windows machine over SSH, by reading the accessibility / UI Automation tree instead of taking a screenshot at every step, and uses **Jev** (TypeSafe's System One decision model; a TypeSafe, OpenRouter or Command Code key works) as a fast judge. Since 0.4, Jev can also look at the screen itself (`look`: Jev 1.14 image input and boxes) to find icons and things in game scenes. → [English README](README.en.md)
 
-给编码代理（Claude Code、Codex 等）用的桌面操作（computer use）MCP 服务：让 AI 自己操作 Mac 和 Windows 的桌面，也能通过 SSH 操作另一台 Windows。
+给编码代理（Claude Code、Codex 等）用的桌面操作（computer use）MCP 服务（原名 reflex-cu）：让 AI 自己操作 Mac 和 Windows 的桌面，也能通过 SSH 操作另一台 Windows。
 
 名字里的 reflex 是"反射"：除了常规的截图、点击、打字，它把"点哪个""成功了没""加载完没"这类不需要思考的高频小判断，交给一个反射式的快速判断模型去做，代理不用每一步都看截图。目前接的判断模型是 [Jev](https://typesafe.ai)（TypeSafe 的 System One 模型，一次约 0.3 秒）。
 
@@ -73,7 +73,7 @@ Jev 1.13 起能看图，1.14 又加了"框出某个东西"的问题类型。加�
 
 需要 Python 3.10 以上。
 
-**快速安装（操作本机 Mac 或 Windows）**：PyPI 发布尚未完成。装了 [uv](https://docs.astral.sh/uv/) 后，可以直接从 GitHub 源码包注册：
+**快速安装（操作本机 Mac 或 Windows）**：装了 [uv](https://docs.astral.sh/uv/) 后，可以直接从 GitHub 源码包注册：
 
 ```
 claude mcp add reflexcu -s user -- uvx --from https://github.com/8itlab/reflex-computer-use/archive/refs/heads/main.tar.gz reflex-computer-use
@@ -103,7 +103,7 @@ codex mcp add reflexcu -- uvx --from https://github.com/8itlab/reflex-computer-u
 ### 本机 Mac
 
 ```
-git clone https://github.com/8itlab/reflex-computer-use && cd reflex-cu
+git clone https://github.com/8itlab/reflex-computer-use && cd reflex-computer-use
 python3 -m venv ~/.reflexcu/venv
 ~/.reflexcu/venv/bin/pip install -r requirements-macos.txt
 claude mcp add reflexcu -s user -- ~/.reflexcu/venv/bin/python "$PWD/reflexcu/server.py"
@@ -115,7 +115,7 @@ claude mcp add reflexcu -s user -- ~/.reflexcu/venv/bin/python "$PWD/reflexcu/se
 
 ```
 git clone https://github.com/8itlab/reflex-computer-use
-cd reflex-cu
+cd reflex-computer-use
 python -m venv venv
 venv\Scripts\pip install -r requirements-windows.txt
 claude mcp add reflexcu -s user -- "%CD%\venv\Scripts\python.exe" "%CD%\reflexcu\server.py"
@@ -147,8 +147,8 @@ claude mcp add winbox -s user -e CU_SSH=<ssh 别名> -e 'CU_DIR=C:\reflexcu' -- 
 它是标准的 stdio MCP 服务，Codex 同样能用。把上面 `claude mcp add` 换成 `codex mcp add`，环境变量用 `--env`：
 
 ```
-codex mcp add reflexcu -- ~/.reflexcu/venv/bin/python /path/to/reflex-cu/reflexcu/server.py
-codex mcp add winbox --env CU_SSH=<ssh 别名> --env 'CU_DIR=C:\reflexcu' -- python3 /path/to/reflex-cu/reflexcu/server.py
+codex mcp add reflexcu -- ~/.reflexcu/venv/bin/python /path/to/reflex-computer-use/reflexcu/server.py
+codex mcp add winbox --env CU_SSH=<ssh 别名> --env 'CU_DIR=C:\reflexcu' -- python3 /path/to/reflex-computer-use/reflexcu/server.py
 ```
 
 只读工具（`status`、`screenshot`、`windows`、`observe`、`check`、`wait`）带有只读标注，`codex exec` 这类非交互运行可以直接调用；会动鼠标键盘的工具需要你在交互界面里批准。在 Mac 上，系统权限是按启动服务的应用给的：从 ChatGPT 应用里用，就要给 ChatGPT 开"辅助功能"和"屏幕录制"。
@@ -208,9 +208,9 @@ CU_SHOT=shot.jpg python reflexcu/server.py screenshot
 
 ## 实测数据
 
-都是同一个代理（Claude Opus 5.5）、同一句任务描述，只换工具：一组用 reflex-cu 的全部工具，另一组把同一个服务限制成只有截图、点击、按键（`CU_TOOLS=screenshot`）。对照组是本项目自己的截图模式，不是别家产品。每格只跑了 2 次，数字只能看量级。
+都是同一个代理（Claude Opus 5.5）、同一句任务描述，只换工具：一组用 reflex-computer-use 的全部工具，另一组把同一个服务限制成只有截图、点击、按键（`CU_TOOLS=screenshot`）。对照组是本项目自己的截图模式，不是别家产品。每格只跑了 2 次，数字只能看量级。
 
-| 任务 | reflex-cu 全部工具 | 只用截图和点击 |
+| 任务 | reflex-computer-use 全部工具 | 只用截图和点击 |
 |---|---|---|
 | Mac，只说一句话："打开 ChatGPT 应用" | 8 / 9 秒，4 次调用 | 18 / 30 秒，7 / 12 次调用 |
 | Mac，只说一句话："打开计算器，算出 1234 乘以 56" | 23 / 22 秒，5–6 次调用 | 35 / 38 秒，21 次调用 |
@@ -221,13 +221,13 @@ CU_SHOT=shot.jpg python reflexcu/server.py screenshot
 
 ## 常见问题
 
-**reflex-cu 是什么？** 一个标准的 stdio MCP 服务，给 AI 代理提供"看屏幕、动鼠标键盘"的工具，也就是通常说的 computer use。它装在你自己的机器上，由你已经在用的代理（Claude Code、Codex、ChatGPT 桌面应用里的 Codex）来调用。
+**reflex-computer-use 是什么？** 一个标准的 stdio MCP 服务，给 AI 代理提供"看屏幕、动鼠标键盘"的工具，也就是通常说的 computer use。它装在你自己的机器上，由你已经在用的代理（Claude Code、Codex、ChatGPT 桌面应用里的 Codex）来调用。
 
-**和模型自带的 computer use 有什么不同？** 常见做法是每一步截一张图交给大模型看。reflex-cu 优先直接读出界面上的控件（名称、状态、坐标），只有图标、游戏画面这类没有文字的内容才看图，而且看图找东西也可以交给 Jev（`look`），截图不必进大模型的上下文；"点哪个""成功了没"这类小判断交给 Jev。它还能通过 SSH 操作另一台 Windows 的真实桌面。
+**和模型自带的 computer use 有什么不同？** 常见做法是每一步截一张图交给大模型看。reflex-computer-use 优先直接读出界面上的控件（名称、状态、坐标），只有图标、游戏画面这类没有文字的内容才看图，而且看图找东西也可以交给 Jev（`look`），截图不必进大模型的上下文；"点哪个""成功了没"这类小判断交给 Jev。它还能通过 SSH 操作另一台 Windows 的真实桌面。
 
 **没有 Jev 密钥能用吗？** 能。截图、读界面、鼠标、键盘都不需要密钥，只有 `find`、`check`、`wait` 三个工具需要。
 
-**Jev 能看图吗？** 能，Jev 1.13 起支持图片，目前还是实验性功能。reflex-cu 0.4 起用它来找图标和游戏画面里的东西（`look`），只支持 TypeSafe 官方密钥，见上文"看画面"。
+**Jev 能看图吗？** 能，Jev 1.13 起支持图片，目前还是实验性功能。reflex-computer-use 0.4 起用它来找图标和游戏画面里的东西（`look`），只支持 TypeSafe 官方密钥，见上文"看画面"。
 
 **Jev 的密钥从哪来？** TypeSafe 官方、OpenRouter、Command Code 三选一，见上文"Jev 密钥"。在访问不了 TypeSafe 的网络里，可以用 OpenRouter 的密钥。
 

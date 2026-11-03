@@ -1,10 +1,8 @@
-# reflex-cu
-
-<!-- mcp-name: io.github.8itlab/reflex-computer-use -->
+# reflex-computer-use
 
 [中文](https://github.com/8itlab/reflex-computer-use/blob/main/README.md)
 
-**reflex-cu** is an open-source **computer use** MCP server for coding agents such as Claude Code and Codex. It lets an AI agent operate a macOS or Windows desktop, or a remote Windows machine over SSH, by reading the accessibility / UI Automation tree instead of taking a screenshot at every step.
+**reflex-computer-use** is an open-source **computer use** MCP server for coding agents such as Claude Code and Codex (formerly reflex-cu). It lets an AI agent operate a macOS or Windows desktop, or a remote Windows machine over SSH, by reading the accessibility / UI Automation tree instead of taking a screenshot at every step.
 
 The "reflex" in the name is the idea: besides the usual screenshots, clicks and typing, the small, frequent decisions that need no deliberation ("which element?", "did that work?", "has it finished loading?") go to a fast, reflex-like judge model, so the agent no longer has to look at a screenshot after every step. The judge currently wired in is [Jev](https://typesafe.ai), TypeSafe's System One model, which answers in about 0.3 seconds.
 
@@ -75,7 +73,7 @@ To have an AI install it for you, give your coding agent the link to [INSTALL_FO
 
 Python 3.10 or later.
 
-**Quick start (controlling this Mac or Windows machine)**: the PyPI release is pending. With [uv](https://docs.astral.sh/uv/) installed, run directly from the GitHub source archive:
+**Quick start (controlling this Mac or Windows machine)**: with [uv](https://docs.astral.sh/uv/) installed, run directly from the GitHub source archive:
 
 ```
 claude mcp add reflexcu -s user -- uvx --from https://github.com/8itlab/reflex-computer-use/archive/refs/heads/main.tar.gz reflex-computer-use
@@ -105,7 +103,7 @@ If your network cannot reach TypeSafe's API (HTTP 451), switch to another source
 ### Local Mac
 
 ```
-git clone https://github.com/8itlab/reflex-computer-use && cd reflex-cu
+git clone https://github.com/8itlab/reflex-computer-use && cd reflex-computer-use
 python3 -m venv ~/.reflexcu/venv
 ~/.reflexcu/venv/bin/pip install -r requirements-macos.txt
 claude mcp add reflexcu -s user -- ~/.reflexcu/venv/bin/python "$PWD/reflexcu/server.py"
@@ -117,7 +115,7 @@ The app that launches the agent (Terminal, an IDE) needs the Accessibility and S
 
 ```
 git clone https://github.com/8itlab/reflex-computer-use
-cd reflex-cu
+cd reflex-computer-use
 python -m venv venv
 venv\Scripts\pip install -r requirements-windows.txt
 claude mcp add reflexcu -s user -- "%CD%\venv\Scripts\python.exe" "%CD%\reflexcu\server.py"
@@ -149,8 +147,8 @@ For several machines, register one server per machine and give each its own loca
 It is a standard stdio MCP server, so Codex can use it too. Replace `claude mcp add` above with `codex mcp add`, and pass environment variables with `--env`:
 
 ```
-codex mcp add reflexcu -- ~/.reflexcu/venv/bin/python /path/to/reflex-cu/reflexcu/server.py
-codex mcp add winbox --env CU_SSH=<ssh alias> --env 'CU_DIR=C:\reflexcu' -- python3 /path/to/reflex-cu/reflexcu/server.py
+codex mcp add reflexcu -- ~/.reflexcu/venv/bin/python /path/to/reflex-computer-use/reflexcu/server.py
+codex mcp add winbox --env CU_SSH=<ssh alias> --env 'CU_DIR=C:\reflexcu' -- python3 /path/to/reflex-computer-use/reflexcu/server.py
 ```
 
 The read-only tools (`status`, `screenshot`, `windows`, `observe`, `check`, `wait`) carry a read-only annotation, so non-interactive runs such as `codex exec` can call them directly; tools that move the mouse or press keys need your approval in the interactive UI. On macOS, permissions belong to the app that launches the server: when used from the ChatGPT app, grant Accessibility and Screen Recording to ChatGPT.
@@ -210,9 +208,9 @@ This tool can see the screen and control the mouse and keyboard. Treat it accord
 
 ## Measurements
 
-Same agent (Claude Opus 5.5) and same task sentence each time; only the tools differ. One arm has all of reflex-cu's tools, the other is the same server restricted to screenshots, clicks and keys (`CU_TOOLS=screenshot`). The baseline is this project's own screenshot mode, not another product. Two runs per cell: read these as orders of magnitude.
+Same agent (Claude Opus 5.5) and same task sentence each time; only the tools differ. One arm has all of reflex-computer-use's tools, the other is the same server restricted to screenshots, clicks and keys (`CU_TOOLS=screenshot`). The baseline is this project's own screenshot mode, not another product. Two runs per cell: read these as orders of magnitude.
 
-| Task | All reflex-cu tools | Screenshots and clicks only |
+| Task | All reflex-computer-use tools | Screenshots and clicks only |
 |---|---|---|
 | macOS, one sentence: "open the ChatGPT app" | 8 / 9 s, 4 calls | 18 / 30 s, 7 / 12 calls |
 | macOS, one sentence: "open Calculator and work out 1234 times 56" | 23 / 22 s, 5–6 calls | 35 / 38 s, 21 calls |
@@ -223,13 +221,13 @@ Faster on short tasks, with less than half the tool calls. On a long task with m
 
 ## FAQ
 
-**What is reflex-cu?** A standard stdio MCP server that gives an AI agent the tools to see the screen and use the mouse and keyboard, what is usually called computer use. It runs on your own machine and is called by the agent you already use (Claude Code, Codex, Codex inside the ChatGPT desktop app).
+**What is reflex-computer-use?** A standard stdio MCP server that gives an AI agent the tools to see the screen and use the mouse and keyboard, what is usually called computer use. It runs on your own machine and is called by the agent you already use (Claude Code, Codex, Codex inside the ChatGPT desktop app).
 
-**How is it different from a model's built-in computer use?** The usual loop sends a screenshot to a large model at every step. reflex-cu reads the controls on screen directly (names, state, coordinates) and looks at pixels only for content without text, such as icons or game scenes, and even then Jev can do the looking (`look`) so the screenshot never enters the large model's context. Small decisions like "which element?" and "did that work?" go to Jev. It can also operate the real desktop of another Windows machine over SSH.
+**How is it different from a model's built-in computer use?** The usual loop sends a screenshot to a large model at every step. reflex-computer-use reads the controls on screen directly (names, state, coordinates) and looks at pixels only for content without text, such as icons or game scenes, and even then Jev can do the looking (`look`) so the screenshot never enters the large model's context. Small decisions like "which element?" and "did that work?" go to Jev. It can also operate the real desktop of another Windows machine over SSH.
 
 **Does it work without a Jev key?** Yes. Screenshots, reading the UI, mouse and keyboard need no key. Only `find`, `check` and `wait` do.
 
-**Can Jev see images?** Yes, since Jev 1.13, still as an experimental feature. reflex-cu 0.4 uses it to find icons and things in game scenes (`look`), with a TypeSafe key only; see "Looking at pixels" above.
+**Can Jev see images?** Yes, since Jev 1.13, still as an experimental feature. reflex-computer-use 0.4 uses it to find icons and things in game scenes (`look`), with a TypeSafe key only; see "Looking at pixels" above.
 
 **Where does a Jev key come from?** TypeSafe directly, OpenRouter, or Command Code: see "Jev API key" above. On a network that cannot reach TypeSafe, an OpenRouter key is an alternative.
 

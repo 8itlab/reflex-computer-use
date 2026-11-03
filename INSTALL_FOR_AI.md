@@ -2,7 +2,7 @@
 
 [English](INSTALL_FOR_AI.en.md)
 
-这份文档是写给替用户安装 reflex-cu 的编码代理（Claude Code、Codex 等）看的。用户只需要对你说一句："按 https://github.com/8itlab/reflex-computer-use/blob/main/INSTALL_FOR_AI.md 给我装上。"
+这份文档是写给替用户安装 reflex-computer-use 的编码代理（Claude Code、Codex 等）看的。用户只需要对你说一句："按 https://github.com/8itlab/reflex-computer-use/blob/main/INSTALL_FOR_AI.md 给我装上。"
 
 你要做的是：问清几件事，装好，验证，最后告诉用户怎么开始用。每一步都有检验方法，检验没过就不要往下走。
 
@@ -28,9 +28,9 @@
 ## 本机 Mac
 
 ```
-git clone https://github.com/8itlab/reflex-computer-use ~/reflex-cu
+git clone https://github.com/8itlab/reflex-computer-use ~/reflex-computer-use
 python3 -m venv ~/.reflexcu/venv
-~/.reflexcu/venv/bin/pip install -r ~/reflex-cu/requirements-macos.txt
+~/.reflexcu/venv/bin/pip install -r ~/reflex-computer-use/requirements-macos.txt
 ```
 
 要求 Python 3.10 以上。
@@ -38,7 +38,7 @@ python3 -m venv ~/.reflexcu/venv
 检验：
 
 ```
-~/.reflexcu/venv/bin/python ~/reflex-cu/reflexcu/server.py status
+~/.reflexcu/venv/bin/python ~/reflex-computer-use/reflexcu/server.py status
 ```
 
 应返回一段 JSON。重点看三项：
@@ -84,8 +84,8 @@ ssh <别名> "powershell -ExecutionPolicy Bypass -File C:\reflexcu\scripts\insta
 你运行的这台机器上只需要仓库代码和系统自带的 Python 3，不用装依赖：
 
 ```
-git clone https://github.com/8itlab/reflex-computer-use ~/reflex-cu
-CU_SSH=<别名> CU_DIR='C:\reflexcu' python3 ~/reflex-cu/reflexcu/server.py status
+git clone https://github.com/8itlab/reflex-computer-use ~/reflex-computer-use
+CU_SSH=<别名> CU_DIR='C:\reflexcu' python3 ~/reflex-computer-use/reflexcu/server.py status
 ```
 
 返回的 `host` 应该是远程机器的名字，`screen` 应该是它真实的分辨率。
@@ -123,16 +123,16 @@ Claude Code：
 
 ```
 # 本机
-claude mcp add reflexcu -s user -- ~/.reflexcu/venv/bin/python ~/reflex-cu/reflexcu/server.py
+claude mcp add reflexcu -s user -- ~/.reflexcu/venv/bin/python ~/reflex-computer-use/reflexcu/server.py
 # 远程
-claude mcp add winbox -s user -e CU_SSH=<别名> -e 'CU_DIR=C:\reflexcu' -- python3 ~/reflex-cu/reflexcu/server.py
+claude mcp add winbox -s user -e CU_SSH=<别名> -e 'CU_DIR=C:\reflexcu' -- python3 ~/reflex-computer-use/reflexcu/server.py
 ```
 
 Codex：
 
 ```
-codex mcp add reflexcu -- ~/.reflexcu/venv/bin/python ~/reflex-cu/reflexcu/server.py
-codex mcp add winbox --env CU_SSH=<别名> --env 'CU_DIR=C:\reflexcu' -- python3 ~/reflex-cu/reflexcu/server.py
+codex mcp add reflexcu -- ~/.reflexcu/venv/bin/python ~/reflex-computer-use/reflexcu/server.py
+codex mcp add winbox --env CU_SSH=<别名> --env 'CU_DIR=C:\reflexcu' -- python3 ~/reflex-computer-use/reflexcu/server.py
 ```
 
 - 本机 Windows 上，命令换成 `C:\reflexcu\venv\Scripts\python.exe C:\reflexcu\reflexcu\server.py`。
