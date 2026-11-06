@@ -20,6 +20,11 @@ import Vision
 from Foundation import NSURL
 from PIL import Image
 
+# The first AppKit or Quartz call registers this process as a regular app, and it never runs an event
+# loop, so the Dock shows a Python icon marked not responding. Force quitting that icon kills the MCP
+# server and the client does not start it again. Background-only processes have no Dock icon.
+AppKit.NSApplication.sharedApplication().setActivationPolicy_(AppKit.NSApplicationActivationPolicyProhibited)
+
 VIEW_W = int(os.environ.get('CU_VIEW_W', '1600'))
 TREE = 'ax'
 TMP = Path(tempfile.gettempdir()) / 'reflexcu'
