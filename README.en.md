@@ -2,10 +2,12 @@
 
 [中文](https://github.com/8itlab/reflex-computer-use/blob/main/README.md)
 
-**reflex-computer-use** is an open-source **computer use** MCP server for coding agents such as Claude Code and Codex (formerly reflex-cu). It lets an AI agent operate a macOS or Windows desktop, or a remote Windows machine over SSH, by reading the accessibility / UI Automation tree instead of taking a screenshot at every step.
+**reflex-computer-use** is an open-source **computer use** MCP server for coding agents such as Claude Code and Codex (formerly reflex-cu). It lets an AI agent operate a macOS or Windows desktop, or a remote Windows machine over SSH, by reading the accessibility / UI Automation tree instead of taking a screenshot at every step. On a Mac it works in the background: the agent operates its window while you keep using your computer.
 
 The "reflex" in the name is the idea: besides the usual screenshots, clicks and typing, the small, frequent decisions that need no deliberation ("which element?", "did that work?", "has it finished loading?") go to a fast, reflex-like judge model, so the agent no longer has to look at a screenshot after every step. The judge currently wired in is [Jev](https://typesafe.ai), TypeSafe's System One model, which answers in about 0.3 seconds.
 
+> **New in 0.5: runs in the background, without taking your mouse or keyboard (Mac).** The window the agent works on can sit behind yours: clicks, typing, shortcuts, pasting, drags and scrolling go to that app alone. Your cursor stays put, your foreground app stays in front and keeps the keyboard, so you can keep working while it works. Screenshots and text reading see covered windows too. When real input is unavoidable, as in games, it waits until you stop. A few apps raise their own window (Chrome does when opening a new tab); the keyboard comes back to you within about 0.1 s. See [Runs in the background](#runs-in-the-background-without-taking-your-mouse-or-keyboard-mac).
+>
 > **New in 0.4: Jev can look.** Pass `look: true` to `find`, `check` or `wait` and Jev looks at the screenshot itself: it finds bare icons and characters or objects in game scenes, and answers "is there a … on screen?". The screenshot goes to Jev only, never into the agent's context. Experimental, TypeSafe keys only; see [Looking at pixels](#looking-at-pixels-look-experimental).
 
 Tool descriptions and element labels are currently in Chinese.
@@ -63,9 +65,19 @@ Limits:
 - Only a TypeSafe key works for now. OpenRouter already serves Jev 1.14 but drops the image and lets the model answer blind, so through OpenRouter or Command Code `look` fails with an error instead of guessing. `jev_images` in `status` says whether the current source can see images.
 - Boxing needs Jev 1.14, so `look` uses `jev-preview` by default; once TypeSafe moves `jev-latest` to 1.14, `CU_JEV_VISION_MODEL` can point back to it.
 
-### Sharing the computer with the model (Mac)
+### Runs in the background, without taking your mouse or keyboard (Mac)
 
-The model stays off your mouse and keyboard where it can, and you can keep working in your own windows:
+Computer use usually needs the whole computer: while it moves the mouse and switches windows you can only watch, and touching the mouse makes it misclick. On a Mac, reflex-computer-use sends its input straight to the target app, so the agent works in the background while you work in front. Once the agent has run `observe` on a window, later actions go to that window:
+
+```text
+observe(window: "Chrome")              # read Chrome behind your windows, without bringing it forward
+click(id: 33)                          # click the address bar
+type(text: "youtube.com", enter: true) # type and press Return
+```
+
+Throughout, your cursor does not move, your app stays in front, and Chrome stays behind your windows.
+
+How each action is delivered:
 
 | Action | Route | Effect on you |
 |---|---|---|
@@ -77,7 +89,7 @@ The model stays off your mouse and keyboard where it can, and you can keep worki
 
 Without `window`, actions go to the window last read or focused; a coordinate outside it uses the real mouse. If the target has closed, the call fails instead of reaching another window. Add `global: true` for system-wide shortcuts.
 
-Background input works by telling the target app it was activated, while the real frontmost app stays the same. It relies on undocumented event fields and `CGEventSetWindowLocation`, so an OS update may break it. Games and other programs that read hardware input directly do not receive it; use `real: true`.
+Under the hood, background input works by telling the target app it was activated, while the real frontmost app stays the same. It relies on undocumented event fields and `CGEventSetWindowLocation`, so an OS update may break it. Games and other programs that read hardware input directly do not receive it; use `real: true`.
 
 ### Coordinates
 
@@ -241,6 +253,8 @@ Faster on short tasks, with less than half the tool calls. On a long task with m
 **What is reflex-computer-use?** A standard stdio MCP server that gives an AI agent the tools to see the screen and use the mouse and keyboard, what is usually called computer use. It runs on your own machine and is called by the agent you already use (Claude Code, Codex, Codex inside the ChatGPT desktop app).
 
 **How is it different from a model's built-in computer use?** The usual loop sends a screenshot to a large model at every step. reflex-computer-use reads the controls on screen directly (names, state, coordinates) and looks at pixels only for content without text, such as icons or game scenes, and even then Jev can do the looking (`look`) so the screenshot never enters the large model's context. Small decisions like "which element?" and "did that work?" go to Jev. It can also operate the real desktop of another Windows machine over SSH.
+
+**Can I keep using my computer while the agent works?** On a Mac, yes. The window it works on can be behind yours, and its clicks and typing go to that app alone, without moving your cursor or taking your keyboard; see "Runs in the background" above. Where real input is unavoidable, as in games, it waits until you stop. On Windows it still uses the mouse and keyboard.
 
 **Does it work without a Jev key?** Yes. Screenshots, reading the UI, mouse and keyboard need no key. Only `find`, `check` and `wait` do.
 

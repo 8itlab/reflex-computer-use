@@ -1,11 +1,13 @@
 # reflex-computer-use
 
-> **reflex-computer-use** is an open-source **computer use** MCP server for Claude Code, Codex and other AI agents. It controls macOS and Windows desktops, including a remote Windows machine over SSH, by reading the accessibility / UI Automation tree instead of taking a screenshot at every step, and uses **Jev** (TypeSafe's System One decision model; a TypeSafe, OpenRouter or Command Code key works) as a fast judge. Since 0.4, Jev can also look at the screen itself (`look`: Jev 1.14 image input and boxes) to find icons and things in game scenes. → [English README](README.en.md)
+> **reflex-computer-use** is an open-source **computer use** MCP server for Claude Code, Codex and other AI agents. It controls macOS and Windows desktops, including a remote Windows machine over SSH, by reading the accessibility / UI Automation tree instead of taking a screenshot at every step, and uses **Jev** (TypeSafe's System One decision model; a TypeSafe, OpenRouter or Command Code key works) as a fast judge. On macOS it works **in the background** since 0.5: clicks, typing and scrolling go to the window the agent is working on, even behind your other windows, without moving your cursor or taking your keyboard. Since 0.4, Jev can also look at the screen itself (`look`: Jev 1.14 image input and boxes) to find icons and things in game scenes. → [English README](README.en.md)
 
-给编码代理（Claude Code、Codex 等）用的桌面操作（computer use）MCP 服务（原名 reflex-cu）：让 AI 自己操作 Mac 和 Windows 的桌面，也能通过 SSH 操作另一台 Windows。
+给编码代理（Claude Code、Codex 等）用的桌面操作（computer use）MCP 服务（原名 reflex-cu）：让 AI 自己操作 Mac 和 Windows 的桌面，也能通过 SSH 操作另一台 Windows。在 Mac 上，AI 可以在后台操作窗口，你照常用自己的电脑，互不干扰。
 
 名字里的 reflex 是"反射"：除了常规的截图、点击、打字，它把"点哪个""成功了没""加载完没"这类不需要思考的高频小判断，交给一个反射式的快速判断模型去做，代理不用每一步都看截图。目前接的判断模型是 [Jev](https://typesafe.ai)（TypeSafe 的 System One 模型，一次约 0.3 秒）。
 
+> **0.5 新功能：后台运行，不抢你的鼠标键盘（Mac）。** AI 操作的窗口可以压在你的窗口下面：点击、输入、快捷键、粘贴、拖动、滚轮都只发给那个应用，你的光标不动、前台不切、键盘焦点不丢，你可以一边干自己的活一边让它干活。截图和读字也能看到被挡住的窗口。非要动真实鼠标键盘时（比如游戏），它会先等你停手。少数应用会自己把窗口抬上来（比如 Chrome 新建标签页），这时键盘焦点约 0.1 秒内还给你。详见下文[后台运行，不抢你的鼠标键盘](#后台运行不抢你的鼠标键盘mac)。
+>
 > **0.4 新功能：Jev 能看画面了。** 给 `find`、`check`、`wait` 加上 `look: true`，Jev 直接看截图：能找到纯图标、游戏画面里的人物和物件，也能回答"画面里有没有某样东西"。截图只发给 Jev，不进代理的上下文。目前是实验性功能，只支持 TypeSafe 官方密钥，详见下文[看画面](#看画面look实验性)。
 
 [English](README.en.md)
@@ -63,9 +65,19 @@ Jev 1.13 起能看图，1.14 又加了"框出某个东西"的问题类型。加�
 - 目前只有 TypeSafe 官方密钥能用。OpenRouter 已经上了 Jev 1.14，但会把图片丢掉、让模型闭着眼回答，所以通过 OpenRouter 或 Command Code 时 `look` 会直接报错，而不是瞎答。`status` 的 `jev_images` 表示当前来源能不能看图。
 - 框选需要 Jev 1.14，默认用 `jev-preview`；TypeSafe 把 `jev-latest` 切到 1.14 之后可以用 `CU_JEV_VISION_MODEL` 改回。
 
-### 和用户同时用电脑（Mac）
+### 后台运行，不抢你的鼠标键盘（Mac）
 
-模型操作时尽量不碰你的鼠标键盘，你也可以继续用自己的窗口：
+一般的 computer use 要独占电脑：它动鼠标、切窗口的时候你只能看着，你一碰鼠标它就点错。reflex-computer-use 在 Mac 上把操作直接发给目标应用，AI 在后台干活，你在前台干自己的事。代理只要先 `observe` 指定窗口，之后的操作就都发给那个窗口：
+
+```text
+observe(window: "Chrome")              # 读后台的 Chrome，不切到前台
+click(id: 33)                          # 点地址栏
+type(text: "youtube.com", enter: true) # 输入并回车
+```
+
+整个过程中你的光标不动，前台还是你正在用的应用，Chrome 也一直压在你的窗口下面。
+
+各种操作的走法：
 
 | 操作 | 走法 | 对你的影响 |
 |---|---|---|
@@ -77,7 +89,7 @@ Jev 1.13 起能看图，1.14 又加了"框出某个东西"的问题类型。加�
 
 不写 `window` 时，操作发给上次读过或切过的窗口；坐标落在该窗口外时走真实鼠标。目标窗口已关闭时报错，不会打到别的窗口。全局快捷键加 `global: true`。
 
-后台操作靠的是告诉目标应用“你被激活了”，真实前台并没有变，用到了系统未公开的事件字段和 `CGEventSetWindowLocation`，系统升级后可能失效。游戏这类直接读硬件输入的程序收不到后台事件，要用 `real: true`。
+实现上，后台操作靠的是告诉目标应用“你被激活了”，真实前台并没有变，用到了系统未公开的事件字段和 `CGEventSetWindowLocation`，系统升级后可能失效。游戏这类直接读硬件输入的程序收不到后台事件，要用 `real: true`。
 
 ### 坐标
 
@@ -241,6 +253,8 @@ CU_SHOT=shot.jpg python reflexcu/server.py screenshot
 **reflex-computer-use 是什么？** 一个标准的 stdio MCP 服务，给 AI 代理提供"看屏幕、动鼠标键盘"的工具，也就是通常说的 computer use。它装在你自己的机器上，由你已经在用的代理（Claude Code、Codex、ChatGPT 桌面应用里的 Codex）来调用。
 
 **和模型自带的 computer use 有什么不同？** 常见做法是每一步截一张图交给大模型看。reflex-computer-use 优先直接读出界面上的控件（名称、状态、坐标），只有图标、游戏画面这类没有文字的内容才看图，而且看图找东西也可以交给 Jev（`look`），截图不必进大模型的上下文；"点哪个""成功了没"这类小判断交给 Jev。它还能通过 SSH 操作另一台 Windows 的真实桌面。
+
+**AI 操作的时候我还能用电脑吗？** 在 Mac 上能。AI 操作的窗口可以在你的窗口后面，它的点击和输入只发给那个应用，不动你的光标、不抢你的键盘，见上文"后台运行，不抢你的鼠标键盘"。游戏这类必须用真实鼠标键盘的，它会等你停手再动。Windows 上目前还会占用鼠标键盘。
 
 **没有 Jev 密钥能用吗？** 能。截图、读界面、鼠标、键盘都不需要密钥，只有 `find`、`check`、`wait` 三个工具需要。
 
