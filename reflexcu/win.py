@@ -70,7 +70,7 @@ def view_size():
     return round(mon['width'] * scale(mon)), round(mon['height'] * scale(mon))
 
 
-def grab(region=None, zoom=False, quality=70):
+def grab(region=None, zoom=False, quality=70, window=None):
     """region is [x0, y0, x1, y1] in view space. zoom keeps physical resolution."""
     mon = monitor()
     k = scale(mon)
@@ -522,7 +522,7 @@ def reveal(item):
 _ocr = None
 
 
-def observe_ocr(region=None):
+def observe_ocr(region=None, window=None):
     """OCR works on physical pixels (small text survives), results come back in view space."""
     global _ocr
     if _ocr is None:

@@ -110,6 +110,11 @@ SRC = {'source': {'type': 'string', 'enum': ['auto', 'tree', 'ocr', 'both'],
 LOOK = {'look': {'type': 'boolean', 'description': '让 Jev 直接看截图，而不只是读文字：图标、游戏画面、图片、颜色这类没有文字的内容用它。'
                  '截图只发给 Jev，不进你的上下文。目前只有 TypeSafe 官方密钥支持（status 里 jev_images=true），每次多 1~3 秒'}}
 
+CARE = {'force': {'type': 'boolean', 'description': '用户正在操作时也不等，直接动手'},
+        'patience': {'type': 'number', 'description': '等用户停手最多等几秒，默认 8'}}
+REAL = {'type': 'boolean', 'description': '用真实鼠标，不走后台'}
+KEYS = {**WIN, 'global': {'type': 'boolean', 'description': '发给系统而不是某个应用：全局快捷键（切换应用、聚焦搜索这类）要加'}, **CARE}
+
 TOOLS = {
     'status': ('机器状态：分辨率、坐标系、前台窗口、用户多久没动鼠标键盘（idle_seconds）。操作前先看 idle_seconds，'
                '用户正在用电脑时不要抢鼠标。', {}, []),
@@ -122,19 +127,26 @@ TOOLS = {
                 '重名的控件标出所属分组；打开着的菜单和下拉选项也会列出（popup=true）。滚动区域里还没滚到的项也会列出（offscreen=true，没有坐标）：用 id 点击或 find 点击时会先自动滚动到它。filter 按文字过滤，多个词用 | 隔开。',
                 {**WIN, **SRC, 'filter': {'type': 'string'}, 'limit': {'type': 'integer'},
                  'region': {'type': 'array', 'items': {'type': 'integer'}}}, []),
-    'click': ('点击坐标或元素 id。', {**XY, 'button': {'type': 'string', 'enum': ['left', 'right', 'middle']},
-                              'count': {'type': 'integer', 'description': '2 是双击'},
-                              'hold': {'type': 'number', 'description': '按住秒数'}}, []),
+    'click': ('点击坐标或元素 id。Mac 上落在后台窗口（window 指定的，或上次读过的）里时不动鼠标、不切窗口（route=bg），'
+              '游戏这类收不到时加 real=true；前台窗口用 id 时走辅助功能（route=ax），用坐标时动真实鼠标（route=real），'
+              '会先等用户停手。',
+              {**XY, 'button': {'type': 'string', 'enum': ['left', 'right', 'middle']},
+               'count': {'type': 'integer', 'description': '2 是双击'},
+               'hold': {'type': 'number', 'description': '按住秒数'},
+               'real': REAL, **WIN, **CARE}, []),
     'move': ('移动鼠标。relative=true 时 x/y 是相对位移（用来转游戏镜头）。',
-             {**XY, 'relative': {'type': 'boolean'}}, []),
+             {**XY, 'relative': {'type': 'boolean'}, **CARE}, []),
     'drag': ('按住拖动。', {k: {'type': 'integer'} for k in ('x0', 'y0', 'x1', 'y1')} |
-             {'seconds': {'type': 'number'}, 'button': {'type': 'string'}}, ['x0', 'y0', 'x1', 'y1']),
-    'scroll': ('滚轮。dy>0 向下，单位是格。', {**XY, 'dy': {'type': 'integer'}, 'dx': {'type': 'integer'}}, []),
+             {'seconds': {'type': 'number'}, 'button': {'type': 'string'}, 'real': REAL, **WIN, **CARE}, ['x0', 'y0', 'x1', 'y1']),
+    'scroll': ('滚轮。dy>0 向下，单位是格。', {**XY, 'dy': {'type': 'integer'}, 'dx': {'type': 'integer'}, 'real': REAL, **WIN, **CARE}, []),
     'key': ('按键或组合键，如 "ctrl+s"（Mac 上是 "cmd+s"）、"esc"、"w"。hold 是按住秒数（游戏里走路用），times 是重复次数。'
-            '字符键会经过输入法，输入文字请用 type。',
-            {'keys': {'type': 'string'}, 'hold': {'type': 'number'}, 'times': {'type': 'integer'}}, ['keys']),
-    'type': ('输入文字（支持中文）。paste=true 走剪贴板粘贴；enter=true 输完按回车。',
-             {'text': {'type': 'string'}, 'paste': {'type': 'boolean'}, 'enter': {'type': 'boolean'}}, ['text']),
+            '字符键会经过输入法，输入文字请用 type。Mac 上发给 window 指定的窗口，不填就发给上次读过或切过的窗口；'
+            '它在后台时不打扰前台（route=pid）。',
+            {'keys': {'type': 'string'}, 'hold': {'type': 'number'}, 'times': {'type': 'integer'}, **KEYS}, ['keys']),
+    'type': ('输入文字（支持中文）。paste=true 走剪贴板粘贴，Mac 上粘贴后恢复原剪贴板；enter=true 输完按回车。'
+             '给 id 就先点中那个输入框。发到哪个窗口的规则和 key 一样。',
+             {'text': {'type': 'string'}, 'paste': {'type': 'boolean'}, 'enter': {'type': 'boolean'},
+              'id': XY['id'], **KEYS}, ['text']),
     'find': ('【Jev】用一句话描述要操作的东西，Jev 在界面元素里选出对应的那个并给出置信度。click=true 时置信度够就直接点。'
              '约 0.3 秒，不需要截图。默认只认得有文字或有名称的元素；纯图标、游戏画面里的东西加 look=true，'
              'Jev 会看截图框出它（先整窗粗框、再放大局部细框，约 2~5 秒），confidence 是放大后它确实在那里的概率。还不行再用 screenshot 自己看。',
@@ -175,7 +187,9 @@ BASELINE_TOOLS = ('screenshot', 'click', 'move', 'drag', 'scroll', 'key', 'type'
 
 
 HOWTO = ('先用 screenshot 看屏幕，再按截图里的坐标操作。' if os.environ.get('CU_TOOLS') == 'screenshot' else
-         '开始前先调 status：idle_seconds 很小说明用户正在用，先问用户。'
+         ('尽量在后台做，不打扰用户：observe 指定 window，之后的点击、拖动、滚轮、输入都发给那个窗口，不动鼠标、不切窗口。'
+          '不要为了操作去 focus 窗口。后台没生效（游戏等）才加 real=true 或 focus，用真实鼠标键盘，会先等用户停手。'
+          if LOCAL and sys.platform == 'darwin' else '开始前先调 status：idle_seconds 很小说明用户正在用，先问用户。') +
          '读界面用 observe，它直接给出控件的名称、开关状态和坐标；'
          '只有图标、游戏画面这类没有文字的内容才用 screenshot 看图再按坐标点。'
          '路径明确的多步操作可以写进一次 steps，它会在没把握的那一步自己停下。')
@@ -211,7 +225,7 @@ def handle(msg):
     if m == 'initialize':
         return {'jsonrpc': '2.0', 'id': i, 'result': {
             'protocolVersion': msg['params'].get('protocolVersion', '2024-11-05'),
-            'capabilities': {'tools': {}}, 'serverInfo': {'name': 'reflex-computer-use', 'version': '0.4.0'},
+            'capabilities': {'tools': {}}, 'serverInfo': {'name': 'reflex-computer-use', 'version': '0.5.0'},
             'instructions': WHERE + HOWTO}}
     if m == 'tools/list':
         return {'jsonrpc': '2.0', 'id': i, 'result': {'tools': tool_list()}}

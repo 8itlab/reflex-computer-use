@@ -12,7 +12,7 @@ from pathlib import Path
 
 import httpx
 
-VERSION = '0.4.0'
+VERSION = '0.5.0'
 # Where Jev can be reached. All of these speak the same System One protocol (state + typed questions
 # in, probabilities out); only the address, the key and the name of the model differ.
 PROVIDERS = {
@@ -63,7 +63,7 @@ def observe(window=None, source='auto', region=None):
     named = sum(1 for e in els if e['text'] and e['role'] != '菜单')
     if source in ('ocr', 'both') or (source == 'auto' and named < 6):
         seen = {e['text'] for e in els}
-        els += [e for e in B.observe_ocr(region or clip(info['rect'])) if e['text'] not in seen]
+        els += [e for e in B.observe_ocr(region or clip(info['rect']), window=info) if e['text'] not in seen]
     if not region:
         try:
             seen = {(e['text'], e['rect'][1] // 8) for e in els}
@@ -272,7 +272,7 @@ def jev_check(question, window=None, source='auto', look=False):
     pics = None
     if look:
         ref = shot_ref()
-        pics = {ref: fit(B.grab(clip(info['rect']))[0])[0]}
+        pics = {ref: fit(B.grab(clip(info['rect']), window=info)[0])[0]}
         state['shot'] = ref
         about = '`shot` 是当前窗口的截图，`screen` 是从界面读出的文字（可能不全）。根据它们判断'
     p = jev(state, {'q': {'type': 'noul', 'instructions': f'{about}：{question}'}}, pics)['q'].get('noul', 0.0)
@@ -311,8 +311,8 @@ def boxed(answer, area, fx, fy):
             round(area[0] + b['right'] / fx * w), round(area[1] + b['bottom'] / fy * h)]
 
 
-def look_once(goal, area, zoom=False):
-    img = B.grab(area, zoom=zoom)[0]
+def look_once(goal, area, zoom=False, window=None):
+    img = B.grab(area, zoom=zoom, window=window)[0]
     pic, fx, fy = fit(img, 1280, grow=True) if zoom else fit(img)
     ref = shot_ref()
     a = jev({'shot': ref}, {'there': {'type': 'noul', 'instructions': f'`shot` 是屏幕截图。图里能不能看到：{goal}'},
@@ -328,7 +328,7 @@ def jev_locate(goal, window=None, region=None):
     on the wrong thing, the crop no longer shows the target."""
     info = B.find_window(window) if not region else {}
     area = clip(region or info['rect'])
-    seen, rough, _ = look_once(goal, area)
+    seen, rough, _ = look_once(goal, area, window=info or None)
     out = {'info': info, 'area': area, 'rough': rough, 'seen': round(seen, 3)}
     if seen < 0.3:
         return dict(out, present=round(seen, 3), rect=None)
@@ -338,7 +338,7 @@ def jev_locate(goal, window=None, region=None):
     cx = min(max((rough[0] + rough[2]) // 2, area[0] + cw // 2), area[2] - cw // 2)
     cy = min(max((rough[1] + rough[3]) // 2, area[1] + ch // 2), area[3] - ch // 2)
     crop = [cx - cw // 2, cy - ch // 2, cx + cw - cw // 2, cy + ch - ch // 2]
-    present, rect, conf = look_once(goal, crop, zoom=True)
+    present, rect, conf = look_once(goal, crop, zoom=True, window=info or None)
     return dict(out, present=round(present, 3), rect=rect, box_confidence=round(conf, 3), crop=crop)
 
 
@@ -365,10 +365,11 @@ def op_status(a):
 
 
 def op_screenshot(a):
-    region = a.get('region')
-    if a.get('window') and not region:
-        region = clip(B.find_window(a['window'])['rect'])
-    img, data = B.grab(region, zoom=bool(a.get('zoom')), quality=int(a.get('quality', 70)))
+    region, info = a.get('region'), None
+    if a.get('window'):
+        info = B.find_window(a['window'])
+        region = region or clip(info['rect'])
+    img, data = B.grab(region, zoom=bool(a.get('zoom')), quality=int(a.get('quality', 70)), window=info)
     return {'image': base64.b64encode(data).decode(), 'size': list(img.size), 'region': region,
             'note': 'zoom 图只用来看清细节，坐标仍以普通截图为准' if a.get('zoom') else None}
 
@@ -378,7 +379,9 @@ def op_windows(a):
 
 
 def op_focus(a):
-    return {'window': B.focus(a.get('window'))}
+    info = B.focus(a.get('window'))
+    LAST.update(window=info, time=time.time())
+    return {'window': info}
 
 
 def op_observe(a):
@@ -389,52 +392,133 @@ def op_observe(a):
     return {'window': info, 'count': len(els), 'elements': [brief(e) for e in shown[:int(a.get('limit', 150))]]}
 
 
+def element(a):
+    els, i = LAST['elements'], int(a['id'])
+    if not 0 <= i < len(els):
+        raise ValueError(f'no element {i} in the last observation')
+    return els[i]
+
+
 def target(a):
-    if a.get('id') is not None:
-        els = LAST['elements']
-        i = int(a['id'])
-        if not 0 <= i < len(els):
-            raise ValueError(f'no element {i} in the last observation')
-        return center(shown(els[i]))
-    return int(a['x']), int(a['y'])
+    return center(shown(element(a))) if a.get('id') is not None else (int(a['x']), int(a['y']))
+
+
+def wait_user(a, pid=None):
+    """Real input shares one mouse and keyboard with the user, so it waits for a pause in what they are doing.
+    Input sent to a background app only has to wait when the user has since moved into that app."""
+    if not hasattr(B, 'user_busy') or a.get('force') or (pid is not None and pid not in (B.front_pid(), B.front_app())):
+        return {}
+    t = time.time()
+    limit = float(a.get('patience', 8))
+    while B.user_busy():
+        if time.time() - t > limit:
+            raise RuntimeError(f'用户一直在操作，等了 {limit:g} 秒没有执行。稍后再试，或用 force=true 强行操作')
+        time.sleep(0.2)
+    waited = int((time.time() - t) * 1000)
+    return {'waited_ms': waited} if waited else {}
+
+
+def click_at(a, x, y, el=None, hold=0.04):
+    button, count = a.get('button', 'left'), int(a.get('count', 1))
+    info = background(a, (x, y))
+    if info:
+        waited = wait_user(a, info['pid'])
+        B.bg_click(info, x, y, button, count, hold)
+        return {'route': 'bg', 'to': name_of(info), **waited}
+    if el and not a.get('real') and hasattr(B, 'activate'):
+        waited = wait_user(a, LAST['window'] and LAST['window']['pid'])
+        if B.activate(el, button, count):
+            return {'route': 'ax', **waited}
+    waited = wait_user(a)
+    B.click(x, y, button, count, hold)
+    return {'route': 'real', **waited}
 
 
 def op_click(a):
     x, y = target(a)
-    B.click(x, y, a.get('button', 'left'), int(a.get('count', 1)), float(a.get('hold', 0.04)))
-    return {'clicked': [x, y]}
+    el = element(a) if a.get('id') is not None else None
+    return {'clicked': [x, y], **click_at(a, x, y, el, float(a.get('hold', 0.04)))}
 
 
 def op_move(a):
     if a.get('relative'):
+        wait_user(a)
         B.move_rel(a['x'], a['y'])
         return {'moved_by': [a['x'], a['y']]}
     x, y = target(a)
+    waited = wait_user(a)
     B.move_to(x, y)
-    return {'moved': [x, y]}
+    return {'moved': [x, y], **waited}
 
 
 def op_drag(a):
+    out = {'dragged': [a['x0'], a['y0'], a['x1'], a['y1']]}
+    info = background(a, (a['x0'], a['y0']))
+    if info:
+        out.update(route='bg', to=name_of(info), **wait_user(a, info['pid']))
+        B.bg_drag(info, a['x0'], a['y0'], a['x1'], a['y1'], a.get('button', 'left'), float(a.get('seconds', 0.4)))
+        return out
+    out.update(route='real', **wait_user(a))
     B.drag(a['x0'], a['y0'], a['x1'], a['y1'], a.get('button', 'left'), float(a.get('seconds', 0.4)))
-    return {'dragged': [a['x0'], a['y0'], a['x1'], a['y1']]}
+    return out
 
 
 def op_scroll(a):
     x, y = target(a) if ('x' in a or 'id' in a) else B.cursor()
+    out = {'scrolled': [a.get('dx', 0), a.get('dy', 0)], 'at': [x, y]}
+    info = background(a, (x, y))
+    if info:
+        out.update(route='bg', to=name_of(info), **wait_user(a, info['pid']))
+        B.bg_scroll(info, x, y, a.get('dy', 0), a.get('dx', 0))
+        return out
+    out.update(route='real', **wait_user(a))
     B.scroll(x, y, a.get('dy', 0), a.get('dx', 0))
-    return {'scrolled': [a.get('dx', 0), a.get('dy', 0)], 'at': [x, y]}
+    return out
+
+
+def background(a, point=None):
+    """The window behind the user's to act on: the one named, else the one last read or focused. None means
+    real input, which is only right when there is no target or the target really is in front: anything
+    else would land in whatever the user has open. A target that has gone is an error for the same reason.
+    A point must fall inside the window, since it may have been read off the whole screen."""
+    if not hasattr(B, 'inside') or a.get('global') or a.get('real') or not (a.get('window') or LAST['window']):
+        return None
+    try:
+        info = B.find_window(a.get('window') or LAST['window']['hwnd'])
+    except ValueError:
+        raise RuntimeError('目标窗口不见了，没有执行。重新 observe，或用 global=true 发给系统')
+    r = info['rect']
+    if (info['foreground'] and info['pid'] == B.front_app()) or (point and not (r[0] <= point[0] < r[2] and r[1] <= point[1] < r[3])):
+        return None
+    return info
+
+
+def keyed(a, act):
+    """Run keyboard input by the right route. `act` takes the backend's extra arguments."""
+    info = background(a)
+    if not info:
+        waited = wait_user(a)
+        act({})
+        return {'route': 'real', **waited}
+    waited = wait_user(a, info['pid'])
+    with B.inside(info):
+        act({'pid': info['pid']})
+    return {'route': 'pid', 'to': name_of(info), **waited}
 
 
 def op_key(a):
-    B.press(a['keys'], float(a.get('hold', 0.05)), int(a.get('times', 1)))
-    return {'pressed': a['keys']}
+    out = keyed(a, lambda extra: B.press(a['keys'], float(a.get('hold', 0.05)), int(a.get('times', 1)), **extra))
+    return {'pressed': a['keys'], **out}
 
 
 def op_type(a):
-    B.type_text(a['text'], bool(a.get('paste')))
-    if a.get('enter'):
-        B.press('enter')
-    return {'typed': len(a['text'])}
+    pre = click_at(a, *target(a), element(a)) if a.get('id') is not None else {}
+
+    def act(extra):
+        B.type_text(a['text'], bool(a.get('paste')), **extra)
+        if a.get('enter'):
+            B.press('enter', **extra)
+    return {'typed': len(a['text']), **pre, **keyed(a, act)}
 
 
 def press(out, el, conf, a):
@@ -442,8 +526,7 @@ def press(out, el, conf, a):
     need = float(a.get('min_confidence', 0.75))
     if conf >= need and not el.get('disabled'):
         x, y = center(shown(el))
-        B.click(x, y, a.get('button', 'left'), int(a.get('count', 1)))
-        out['clicked'] = [x, y]
+        out.update(clicked=[x, y], **click_at(a, x, y, el))
     else:
         out['clicked'] = None
         out['why'] = '元素被禁用' if el.get('disabled') else f'置信度 {conf} 低于 {need}，没有点击'

@@ -63,6 +63,22 @@ Limits:
 - Only a TypeSafe key works for now. OpenRouter already serves Jev 1.14 but drops the image and lets the model answer blind, so through OpenRouter or Command Code `look` fails with an error instead of guessing. `jev_images` in `status` says whether the current source can see images.
 - Boxing needs Jev 1.14, so `look` uses `jev-preview` by default; once TypeSafe moves `jev-latest` to 1.14, `CU_JEV_VISION_MODEL` can point back to it.
 
+### Sharing the computer with the model (Mac)
+
+The model stays off your mouse and keyboard where it can, and you can keep working in your own windows:
+
+| Action | Route | Effect on you |
+|---|---|---|
+| Clicks (by coordinate or element id), drags and scrolling on a background window | Events sent to that app only (`route: "bg"`) | Cursor, focus and stacking stay put; works on covered windows |
+| Clicking by element id in the foreground window | Accessibility API (`route: "ax"`) | The cursor stays put |
+| `type` and `key` to a background window, including cmd shortcuts and paste | Events sent to that app only (`route: "pid"`) | Your foreground app is untouched; the clipboard is restored after pasting |
+| Window screenshots, reading text, `look` | Captures the window's own pixels | Works on covered windows |
+| The foreground window, global shortcuts, `real: true` | Real mouse and keyboard (`route: "real"`) | Waits for a 1.5 s pause in your input, up to 8 s, then fails without acting; `force: true` skips this |
+
+Without `window`, actions go to the window last read or focused; a coordinate outside it uses the real mouse. If the target has closed, the call fails instead of reaching another window. Add `global: true` for system-wide shortcuts.
+
+Background input works by telling the target app it was activated, while the real frontmost app stays the same. It relies on undocumented event fields and `CGEventSetWindowLocation`, so an OS update may break it. Games and other programs that read hardware input directly do not receive it; use `real: true`.
+
 ### Coordinates
 
 All coordinates refer to a screenshot taken without `zoom`: the main display scaled down to at most 1600 wide (`CU_VIEW_W` changes that). Where something appears in the screenshot is where to click.
@@ -199,6 +215,7 @@ This tool can see the screen and control the mouse and keyboard. Treat it accord
 
 ## Known limitations
 
+- Background use on Mac: actions that make the app raise its own window still do so (opening a new tab in Chrome brings the window to the front and takes keyboard focus), so navigate in an existing page where possible; minimized windows and windows on other Spaces are not listed, and games that read hardware input do not receive background events. The Windows version has no background operation yet.
 - Only the main display is controlled.
 - `look` is experimental: tightly packed small icons can be missed, and Jev is occasionally confident about a wrong spot; confirm important clicks. Very large windows are slower: on a full-screen 4K game one judgment with `look` takes about 8 s, about 4 s of it text recognition; when only the picture matters, `source: "tree"` skips recognition and it takes about 4 s.
 - Character keys sent with `key` go through the input method; use `type` for text. Holding a key with `key` keeps it down but does not auto-repeat characters.

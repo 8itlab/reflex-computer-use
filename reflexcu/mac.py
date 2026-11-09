@@ -6,17 +6,21 @@ Recording permissions; macOS grants them per host app.
 Coordinates: every x/y the backend takes or returns is in "view" space = main-display points times
 the scale factor, the same convention as the Windows backend.
 """
+import ctypes
 import io
 import os
 import subprocess
 import tempfile
+import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import ApplicationServices as AS
 import AppKit
 import Quartz
 import Vision
+import objc
 from Foundation import NSURL
 from PIL import Image
 
@@ -78,8 +82,21 @@ def capture(region=None, fmt='png'):
     return path
 
 
-def grab(region=None, zoom=False, quality=70):
-    img = Image.open(capture(region)).convert('RGB')
+def window_image(region, info):
+    """`region` (view space) of a window that may be covered by others: the window's own pixels, not the screen's."""
+    path = TMP / 'win.png'
+    subprocess.run(['screencapture', '-x', '-o', '-l', str(info['hwnd']), '-t', 'png', str(path)], check=True, timeout=15)
+    img = Image.open(path).convert('RGB')
+    x0, y0, x1, y1 = info['rect']
+    kx, ky = img.width / max(1, x1 - x0), img.height / max(1, y1 - y0)
+    return img.crop((round((region[0] - x0) * kx), round((region[1] - y0) * ky),
+                     round((region[2] - x0) * kx), round((region[3] - y0) * ky)))
+
+
+def grab(region=None, zoom=False, quality=70, window=None):
+    # The foreground window goes through the screen, so that its open menus are in the picture.
+    img = window_image(region, window) if window and region and not window['foreground'] \
+        else Image.open(capture(region)).convert('RGB')
     if not zoom:
         w, h = (region[2] - region[0], region[3] - region[1]) if region else [round(v * scale()) for v in screen()]
         if (w, h) != img.size:
@@ -100,6 +117,13 @@ def front_pid():
     for w in _cg_windows():
         return w['kCGWindowOwnerPID']
     return None
+
+
+def front_app():
+    """The frontmost app as the system tracks it. It can differ from the app with keyboard focus: pressing a
+    control through accessibility can move focus to an app that stays behind in this list."""
+    app = AppKit.NSWorkspace.sharedWorkspace().frontmostApplication()
+    return app.processIdentifier() if app is not None else None
 
 
 def _cg_windows():
@@ -216,8 +240,176 @@ def idle_seconds():
 
 # ---- input ----
 
-def post(ev):
-    Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+_posted = 0.0  # when this process last sent real input, to tell the user's activity from its own
+
+
+def post(ev, pid=None):
+    global _posted
+    if pid:
+        Quartz.CGEventPostToPid(pid, ev)
+    else:
+        _posted = time.time()
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+
+
+def user_busy(quiet=1.5):
+    """Did the user, not this process, touch the mouse or keyboard within `quiet` seconds?"""
+    idle = idle_seconds()
+    return idle < quiet and time.time() - _posted > idle + 0.05
+
+
+def activate(el, button='left', count=1):
+    """Operate a control through accessibility: no cursor, no typing focus needed. Only for the foreground
+    window, since an app may raise the window and take the keyboard when pressed this way (Chrome's new tab
+    button does). False when this control has no such route and it takes a real click."""
+    ax = el.get('ax')
+    if ax is None or count != 1:
+        return False
+    if button == 'left' and el.get('field'):
+        return AS.AXUIElementSetAttributeValue(ax, 'AXFocused', True) == 0
+    err, names = AS.AXUIElementCopyActionNames(ax, None)
+    action = {'left': 'AXPress', 'right': 'AXShowMenu'}.get(button)
+    return err == 0 and action in (names or []) and AS.AXUIElementPerformAction(ax, action) == 0
+
+
+# ---- input to a window behind others ----
+# An app hit-tests a posted mouse event with the window-local position inside the event, which the window
+# server fills in only for events it routes itself. With that set, an event posted to the process reaches
+# the view under it, and the real cursor and the frontmost app stay as they are. Many views also ignore
+# input while their app is inactive, so the app is first told it was activated, by an event sent to it alone.
+
+class _Point(ctypes.Structure):
+    _fields_ = [('x', ctypes.c_double), ('y', ctypes.c_double)]
+
+
+_cg = ctypes.CDLL('/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics')
+_cg.CGEventSetWindowLocation.argtypes = [ctypes.c_void_p, _Point]
+F_TARGET_PID, F_WINDOW, F_UNDER_POINTER, F_CAN_HANDLE, F_SUBTYPE = 40, 51, 91, 92, 7
+TITLE_BAR = (30, 16)  # points from the window's corner; a click here makes the window key
+_click_number = 90000
+
+
+def window_origin(info):
+    for w in Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionIncludingWindow, info['hwnd']) or []:
+        return w['kCGWindowBounds']['X'], w['kCGWindowBounds']['Y']
+    raise ValueError(f"window {info['hwnd']} is gone")
+
+
+def stamp(ev, info, wx, wy, ox, oy):
+    fields = ((F_TARGET_PID, info['pid']), (F_WINDOW, info['hwnd']), (F_UNDER_POINTER, info['hwnd']),
+              (F_CAN_HANDLE, info['hwnd']), (F_SUBTYPE, 3), (101, 20), (102, 63))
+    for field, value in fields:
+        Quartz.CGEventSetIntegerValueField(ev, field, value)
+    Quartz.CGEventSetLocation(ev, (ox + wx, oy + wy))
+    _cg.CGEventSetWindowLocation(objc.pyobjc_id(ev), _Point(wx, wy))
+    post(ev, info['pid'])
+
+
+def window_mouse(info, kind, wx, wy, origin, button=0, clicks=1, number=0):
+    ev = Quartz.CGEventCreateMouseEvent(None, kind, (origin[0] + wx, origin[1] + wy), button)
+    Quartz.CGEventSetIntegerValueField(ev, Quartz.kCGMouseEventClickState, clicks)
+    Quartz.CGEventSetIntegerValueField(ev, Quartz.kCGMouseEventNumber, number)
+    stamp(ev, info, wx, wy, *origin)
+
+
+def next_click():
+    global _click_number
+    _click_number += 1
+    return _click_number
+
+
+def appkit_event(info, subtype, flags=0):
+    ev = AppKit.NSEvent.otherEventWithType_location_modifierFlags_timestamp_windowNumber_context_subtype_data1_data2_(
+        AppKit.NSEventTypeAppKitDefined, (0, 0), flags, AppKit.NSProcessInfo.processInfo().systemUptime(),
+        info['hwnd'] if subtype == AppKit.NSEventSubtypeApplicationActivated else 0, None, subtype, 0, 0)
+    post(ev.CGEvent(), info['pid'])
+
+
+_inside = {'window': None, 'timer': None}
+
+
+def leave():
+    info, _inside['window'] = _inside['window'], None
+    if info and info['pid'] != front_app():  # the user may have switched to it meanwhile
+        appkit_event(info, AppKit.NSEventSubtypeApplicationDeactivated)
+
+
+@contextmanager
+def inside(info):
+    """Run with the app of `info` believing it is frontmost and that window key. The belief outlasts the call,
+    since telling the app it lost focus clears what the last call left, like the selection in Chrome's
+    address bar, which the next call may need."""
+    if _inside['timer']:
+        _inside['timer'].cancel()
+    origin = window_origin(info)
+    if not _inside['window'] or _inside['window']['hwnd'] != info['hwnd']:
+        leave()
+        appkit_event(info, AppKit.NSEventSubtypeApplicationActivated, 0xc0000)
+        time.sleep(0.03)
+        down, up, _, b = MOUSE['left']
+        n = next_click()
+        window_mouse(info, down, *TITLE_BAR, origin, b, 1, n)
+        time.sleep(0.05)
+        window_mouse(info, up, *TITLE_BAR, origin, b, 1, n)
+        time.sleep(0.12)
+        _inside['window'] = info
+    try:
+        yield origin
+    finally:
+        _inside['timer'] = threading.Timer(5, leave)
+        _inside['timer'].daemon = True
+        _inside['timer'].start()
+
+
+def local(x, y, origin):
+    px, py = to_pts(x, y)
+    return px - origin[0], py - origin[1]
+
+
+def bg_click(info, x, y, button='left', count=1, hold=0.04):
+    down, up, _, b = MOUSE[button]
+    with inside(info) as origin:
+        wx, wy = local(x, y, origin)
+        window_mouse(info, Quartz.kCGEventMouseMoved, wx, wy, origin)
+        time.sleep(0.04)
+        n = next_click()
+        for i in range(count):
+            window_mouse(info, down, wx, wy, origin, b, i + 1, n)
+            time.sleep(hold)
+            window_mouse(info, up, wx, wy, origin, b, i + 1, n)
+            if i + 1 < count:
+                time.sleep(0.08)
+        time.sleep(0.1)
+
+
+def bg_drag(info, x0, y0, x1, y1, button='left', seconds=0.4):
+    down, up, dragged, b = MOUSE[button]
+    with inside(info) as origin:
+        ax0, ay0 = local(x0, y0, origin)
+        ax1, ay1 = local(x1, y1, origin)
+        n = next_click()
+        window_mouse(info, Quartz.kCGEventMouseMoved, ax0, ay0, origin)
+        time.sleep(0.04)
+        window_mouse(info, down, ax0, ay0, origin, b, 1, n)
+        time.sleep(0.08)
+        steps = max(4, int(seconds / 0.016))
+        for i in range(1, steps + 1):
+            window_mouse(info, dragged, ax0 + (ax1 - ax0) * i / steps, ay0 + (ay1 - ay0) * i / steps, origin, b, 1, n)
+            time.sleep(seconds / steps)
+        window_mouse(info, up, ax1, ay1, origin, b, 1, n)
+        time.sleep(0.1)
+
+
+def bg_scroll(info, x, y, dy=0, dx=0):
+    with inside(info) as origin:
+        wx, wy = local(x, y, origin)
+        window_mouse(info, Quartz.kCGEventMouseMoved, wx, wy, origin)
+        time.sleep(0.04)
+        wheel = [(-1 if dy > 0 else 1, 0)] * abs(int(dy)) + [(0, -1 if dx > 0 else 1)] * abs(int(dx))
+        for v, h in wheel:
+            stamp(Quartz.CGEventCreateScrollWheelEvent(None, Quartz.kCGScrollEventUnitLine, 2, v, h), info, wx, wy, *origin)
+            time.sleep(0.02)
+        time.sleep(0.1)
 
 
 MOUSE = {'left': (Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp, Quartz.kCGEventLeftMouseDragged, 0),
@@ -307,47 +499,58 @@ def keycode(name):
     return KEYCODE[n]
 
 
-def key_event(code, down, flags):
+def key_event(code, down, flags, pid=None):
     ev = Quartz.CGEventCreateKeyboardEvent(None, code, down)
     Quartz.CGEventSetFlags(ev, flags)
-    post(ev)
+    post(ev, pid)
 
 
-def press(combo, hold=0.05, times=1):
+def press(combo, hold=0.05, times=1, pid=None):
     codes = [keycode(k) for k in combo.split('+')]
     for i in range(times):
         flags = 0
         for c in codes:
             flags |= FLAGS.get(c, 0)
-            key_event(c, True, flags)
+            key_event(c, True, flags, pid)
             time.sleep(0.01)
         time.sleep(hold)
         for c in reversed(codes):
             flags &= ~FLAGS.get(c, 0)
-            key_event(c, False, flags)
+            key_event(c, False, flags, pid)
         if i + 1 < times:
             time.sleep(0.06)
 
 
-def type_text(text, paste=False):
+def type_text(text, paste=False, pid=None):
     if paste:
         pb = AppKit.NSPasteboard.generalPasteboard()
+        saved = [{t: i.dataForType_(t) for t in i.types()} for i in pb.pasteboardItems() or []]
         pb.clearContents()
         pb.setString_forType_(text, AppKit.NSPasteboardTypeString)
         time.sleep(0.12)
-        press('cmd+v')
-        time.sleep(0.05)
+        press('cmd+v', pid=pid)
+        time.sleep(0.3)  # the app reads the clipboard after it handles the key
+        pb.clearContents()
+        items = []
+        for types in saved:
+            item = AppKit.NSPasteboardItem.alloc().init()
+            for t, data in types.items():
+                if data is not None:
+                    item.setData_forType_(data, t)
+            items.append(item)
+        if items:
+            pb.writeObjects_(items)
         return
     for ch in text:
         if ch == '\n':
-            press('enter')
+            press('enter', pid=pid)
             continue
         n = len(ch.encode('utf-16-le')) // 2
         for down in (True, False):
             ev = Quartz.CGEventCreateKeyboardEvent(None, 0, down)
             Quartz.CGEventSetFlags(ev, 0)
             Quartz.CGEventKeyboardSetUnicodeString(ev, n, ch)
-            post(ev)
+            post(ev, pid)
         time.sleep(0.008)
 
 
@@ -376,10 +579,36 @@ def ax_rect(pos, size):
         return None
 
 
+_awake = set()
+
+
+def wake_tree(info, app, win):
+    """Electron and Chromium build their accessibility tree only once a client asks for it, which takes a
+    moment; reading right away gets an empty page. A foreground window has usually been asked already."""
+    manual = AS.AXUIElementSetAttributeValue(app, 'AXManualAccessibility', True)
+    if info['pid'] in _awake:
+        return
+    _awake.add(info['pid'])
+    bundle = AppKit.NSRunningApplication.runningApplicationWithProcessIdentifier_(info['pid'])
+    bundle = bundle and bundle.bundleURL()
+    if bundle is None or not list(Path(bundle.path()).glob('Contents/Frameworks/*.framework/Helpers')):
+        return
+    if manual != 0:  # Chrome itself answers only to the older switch, and reports an error even as it obeys
+        AS.AXUIElementSetAttributeValue(app, 'AXEnhancedUserInterface', True)
+    for _ in range(12):
+        queue = [win]
+        while queue:
+            el = queue.pop()
+            if ax_get(el, 'AXRole') == 'AXWebArea' and ax_get(el, 'AXChildren'):
+                return
+            queue += list(ax_get(el, 'AXChildren') or [])[:40]
+        time.sleep(0.25)
+
+
 def observe_tree(info, limit=600, budget=3.0):
     app, win = ax_window(info)
-    # Electron and Chromium build their accessibility tree only once a client asks for it.
-    AS.AXUIElementSetAttributeValue(app, 'AXManualAccessibility', True)
+    if win is not None:
+        wake_tree(info, app, win)
     out, deadline = [], time.time() + budget
     wx0, wy0, wx1, wy1 = info['rect']
     queue = [win] if win is not None else []
@@ -415,7 +644,7 @@ def observe_tree(info, limit=600, budget=3.0):
         if role in ('AXRow', 'AXCell') and not text:
             continue
         item = {'role': '标签页' if sub == 'AXTabButton' else ROLES.get(role, '元素'), 'text': text[:120].replace('\n', ' '),
-                'rect': rect, 'src': 'ax', 'clickable': role in CLICKABLE}
+                'rect': rect, 'src': 'ax', 'clickable': role in CLICKABLE, 'ax': el, 'field': role in FIELDS}
         if role in ('AXCheckBox', 'AXSwitch', 'AXRadioButton') and isinstance(vals[4], (int, float)) and not isinstance(vals[4], bool):
             item['state'] = '开' if vals[4] else '关'
         elif holds and named and sub != 'AXSecureTextField' and isinstance(value, str):
@@ -433,9 +662,14 @@ def observe_tree(info, limit=600, budget=3.0):
     return out
 
 
-def observe_ocr(region=None):
-    path = capture(region)
-    img = Image.open(path)
+def observe_ocr(region=None, window=None):
+    if window and region and not window['foreground']:
+        img = window_image(region, window)
+        path = TMP / 'ocr.png'
+        img.save(path)
+    else:
+        path = capture(region)
+        img = Image.open(path)
     vw0 = (region[2] - region[0]) if region else screen()[0] * scale()
     if img.width < vw0 * 1.5:
         # On a non-Retina display UI text is ~10 px tall and Vision skips whole lines; enlarge first.
