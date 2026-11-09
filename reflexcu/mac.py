@@ -325,7 +325,31 @@ def appkit_event(info, subtype, flags=0):
     post(ev.CGEvent(), info['pid'])
 
 
-_inside = {'window': None, 'timer': None}
+_inside = {'window': None, 'timer': None, 'restored': None}
+
+
+def guard_focus(info, before):
+    """Some actions make the app raise itself and take the keyboard (Chrome does on a new tab). Give the
+    keyboard back to the app that had it, The user going to that app on their own within the same
+    second would be undone too, which is rare and cheap next to their typing landing in it."""
+    for _ in range(40):
+        if front_pid() == info['pid'] and before != info['pid']:
+            app = AppKit.NSRunningApplication.runningApplicationWithProcessIdentifier_(before)
+            if app is None or not app.activateWithOptions_(0):
+                return None
+            _inside['window'] = None  # the app was really deactivated: the next call has to tell it again
+            for _ in range(40):
+                if front_pid() == before:
+                    break
+                time.sleep(0.01)
+            return app.localizedName()
+        time.sleep(0.015)
+    return None
+
+
+def pop_restored():
+    name, _inside['restored'] = _inside['restored'], None
+    return {'focus_restored_to': name} if name else {}
 
 
 def leave():
@@ -342,6 +366,7 @@ def inside(info):
     if _inside['timer']:
         _inside['timer'].cancel()
     origin = window_origin(info)
+    before = front_pid()
     if not _inside['window'] or _inside['window']['hwnd'] != info['hwnd']:
         leave()
         appkit_event(info, AppKit.NSEventSubtypeApplicationActivated, 0xc0000)
@@ -356,6 +381,7 @@ def inside(info):
     try:
         yield origin
     finally:
+        _inside['restored'] = guard_focus(info, before) if before else None
         _inside['timer'] = threading.Timer(5, leave)
         _inside['timer'].daemon = True
         _inside['timer'].start()

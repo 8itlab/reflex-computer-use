@@ -188,7 +188,9 @@ BASELINE_TOOLS = ('screenshot', 'click', 'move', 'drag', 'scroll', 'key', 'type'
 
 HOWTO = ('先用 screenshot 看屏幕，再按截图里的坐标操作。' if os.environ.get('CU_TOOLS') == 'screenshot' else
          ('尽量在后台做，不打扰用户：observe 指定 window，之后的点击、拖动、滚轮、输入都发给那个窗口，不动鼠标、不切窗口。'
-          '不要为了操作去 focus 窗口。后台没生效（游戏等）才加 real=true 或 focus，用真实鼠标键盘，会先等用户停手。'
+          '不要为了操作去 focus 窗口。浏览器在后台时别点“新标签页”按钮或按 cmd+t，Chrome 会因此把窗口抬到最前；'
+          '要新开页面就 key cmd+l、type 网址、key cmd+enter，它在后台标签页打开，不抬窗口。'
+          '结果里有 focus_restored_to 说明键盘焦点被应用抢过，已还给用户。后台没生效（游戏等）才加 real=true 或 focus，用真实鼠标键盘，会先等用户停手。'
           if LOCAL and sys.platform == 'darwin' else '开始前先调 status：idle_seconds 很小说明用户正在用，先问用户。') +
          '读界面用 observe，它直接给出控件的名称、开关状态和坐标；'
          '只有图标、游戏画面这类没有文字的内容才用 screenshot 看图再按坐标点。'

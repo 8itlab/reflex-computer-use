@@ -215,7 +215,7 @@ This tool can see the screen and control the mouse and keyboard. Treat it accord
 
 ## Known limitations
 
-- Background use on Mac: actions that make the app raise its own window still do so (opening a new tab in Chrome brings the window to the front and takes keyboard focus), so navigate in an existing page where possible; minimized windows and windows on other Spaces are not listed, and games that read hardware input do not receive background events. The Windows version has no background operation yet.
+- Background use on Mac: actions that make the app raise its own window still do so (opening a new tab in Chrome brings the window to the front and takes keyboard focus), so to open a page in the background type the address and press `cmd+enter`, which opens it in a background tab without raising the window; if focus is taken anyway, maccu gives it back within about 0.1 s and reports `focus_restored_to`, though the window stays raised; minimized windows and windows on other Spaces are not listed, and games that read hardware input do not receive background events. The Windows version has no background operation yet.
 - Only the main display is controlled.
 - `look` is experimental: tightly packed small icons can be missed, and Jev is occasionally confident about a wrong spot; confirm important clicks. Very large windows are slower: on a full-screen 4K game one judgment with `look` takes about 8 s, about 4 s of it text recognition; when only the picture matters, `source: "tree"` skips recognition and it takes about 4 s.
 - Character keys sent with `key` go through the input method; use `type` for text. Holding a key with `key` keeps it down but does not auto-repeat characters.

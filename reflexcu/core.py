@@ -424,7 +424,7 @@ def click_at(a, x, y, el=None, hold=0.04):
     if info:
         waited = wait_user(a, info['pid'])
         B.bg_click(info, x, y, button, count, hold)
-        return {'route': 'bg', 'to': name_of(info), **waited}
+        return {'route': 'bg', 'to': name_of(info), **waited, **B.pop_restored()}
     if el and not a.get('real') and hasattr(B, 'activate'):
         waited = wait_user(a, LAST['window'] and LAST['window']['pid'])
         if B.activate(el, button, count):
@@ -457,7 +457,7 @@ def op_drag(a):
     if info:
         out.update(route='bg', to=name_of(info), **wait_user(a, info['pid']))
         B.bg_drag(info, a['x0'], a['y0'], a['x1'], a['y1'], a.get('button', 'left'), float(a.get('seconds', 0.4)))
-        return out
+        return dict(out, **B.pop_restored())
     out.update(route='real', **wait_user(a))
     B.drag(a['x0'], a['y0'], a['x1'], a['y1'], a.get('button', 'left'), float(a.get('seconds', 0.4)))
     return out
@@ -470,7 +470,7 @@ def op_scroll(a):
     if info:
         out.update(route='bg', to=name_of(info), **wait_user(a, info['pid']))
         B.bg_scroll(info, x, y, a.get('dy', 0), a.get('dx', 0))
-        return out
+        return dict(out, **B.pop_restored())
     out.update(route='real', **wait_user(a))
     B.scroll(x, y, a.get('dy', 0), a.get('dx', 0))
     return out
@@ -503,7 +503,7 @@ def keyed(a, act):
     waited = wait_user(a, info['pid'])
     with B.inside(info):
         act({'pid': info['pid']})
-    return {'route': 'pid', 'to': name_of(info), **waited}
+    return {'route': 'pid', 'to': name_of(info), **waited, **B.pop_restored()}
 
 
 def op_key(a):
